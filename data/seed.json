@@ -1,0 +1,152 @@
+{
+  "experiments": [
+    {
+      "name": "示例A｜缺端点的轻油 TBP 曲线（低温/高温截断）",
+      "sample_id": "TBP-A-2026-01",
+      "feed_density_g_cm3": 0.735,
+      "residue_density_g_cm3": 0.985,
+      "conditions": {
+        "apparatus": "TBP 实沸点蒸馏",
+        "standard": "ASTM D2892",
+        "pressure_mm_hg": 760,
+        "note": "培训数据：首点非0%、末点非100%，演示缺端点与高温不外推"
+      },
+      "notes": "故意只给出 5%~90% 回收段，用于验证缺端点提示与越界切点处理。",
+      "points": [
+        {"temp_c": 55, "recovered_pct": 5.0},
+        {"temp_c": 80, "recovered_pct": 12.0},
+        {"temp_c": 110, "recovered_pct": 22.0},
+        {"temp_c": 145, "recovered_pct": 35.0},
+        {"temp_c": 185, "recovered_pct": 49.0},
+        {"temp_c": 225, "recovered_pct": 62.0},
+        {"temp_c": 265, "recovered_pct": 74.0},
+        {"temp_c": 305, "recovered_pct": 84.0},
+        {"temp_c": 340, "recovered_pct": 90.0}
+      ],
+      "density_rows": [
+        {"temp_c": 60, "density_g_cm3": 0.662},
+        {"temp_c": 100, "density_g_cm3": 0.690},
+        {"temp_c": 150, "density_g_cm3": 0.725},
+        {"temp_c": 200, "density_g_cm3": 0.762},
+        {"temp_c": 260, "density_g_cm3": 0.805},
+        {"temp_c": 320, "density_g_cm3": 0.848},
+        {"temp_c": 350, "density_g_cm3": 0.866}
+      ],
+      "plans": [
+        {
+          "name": "A-初始切割（末切点越界）",
+          "basis": "volume",
+          "loss_pct": 1.5,
+          "cuts": [
+            {"name": "轻石脑油", "start_temp_c": 55, "end_temp_c": 110},
+            {"name": "重石脑油", "start_temp_c": 110, "end_temp_c": 185},
+            {"name": "航煤", "start_temp_c": 185, "end_temp_c": 265},
+            {"name": "柴油", "start_temp_c": 265, "end_temp_c": 370}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "示例B｜全端点原油曲线，密度随馏分显著变化",
+      "sample_id": "TBP-B-2026-02",
+      "feed_density_g_cm3": 0.792,
+      "residue_density_g_cm3": 1.020,
+      "conditions": {
+        "apparatus": "TBP 实沸点蒸馏",
+        "standard": "ASTM D2892 + D5236 深拔",
+        "pressure_mm_hg": 760,
+        "note": "演示质量/体积基准差异与相邻切点相等"
+      },
+      "notes": "完整 0~100% 回收；馏分密度 0.64→0.95 逐段升高，质量产率与体积产率明显不同。",
+      "points": [
+        {"temp_c": 30, "recovered_pct": 0.0},
+        {"temp_c": 65, "recovered_pct": 6.0},
+        {"temp_c": 100, "recovered_pct": 15.0},
+        {"temp_c": 145, "recovered_pct": 28.0},
+        {"temp_c": 185, "recovered_pct": 41.0},
+        {"temp_c": 230, "recovered_pct": 53.0},
+        {"temp_c": 275, "recovered_pct": 64.0},
+        {"temp_c": 320, "recovered_pct": 74.0},
+        {"temp_c": 370, "recovered_pct": 83.0},
+        {"temp_c": 430, "recovered_pct": 91.0},
+        {"temp_c": 520, "recovered_pct": 97.0},
+        {"temp_c": 600, "recovered_pct": 100.0}
+      ],
+      "density_rows": [
+        {"temp_c": 45, "density_g_cm3": 0.640},
+        {"temp_c": 80, "density_g_cm3": 0.672},
+        {"temp_c": 120, "density_g_cm3": 0.705},
+        {"temp_c": 165, "density_g_cm3": 0.748},
+        {"temp_c": 205, "density_g_cm3": 0.782},
+        {"temp_c": 250, "density_g_cm3": 0.815},
+        {"temp_c": 300, "density_g_cm3": 0.846},
+        {"temp_c": 345, "density_g_cm3": 0.872},
+        {"temp_c": 400, "density_g_cm3": 0.905},
+        {"temp_c": 475, "density_g_cm3": 0.932},
+        {"temp_c": 560, "density_g_cm3": 0.950}
+      ],
+      "plans": [
+        {
+          "name": "B-常规切割（含相邻切点相等的零宽馏分）",
+          "basis": "mass",
+          "loss_pct": 0.0,
+          "cuts": [
+            {"name": "液化气/轻石脑油", "start_temp_c": 30, "end_temp_c": 100},
+            {"name": "重石脑油", "start_temp_c": 100, "end_temp_c": 185},
+            {"name": "航煤", "start_temp_c": 185, "end_temp_c": 185},
+            {"name": "柴油", "start_temp_c": 185, "end_temp_c": 320},
+            {"name": "VGO 蜡油", "start_temp_c": 320, "end_temp_c": 520},
+            {"name": "减压渣油馏出段", "start_temp_c": 520, "end_temp_c": 600}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "示例C｜疑似抄录错误曲线（含下降段），含重叠/缺口切点",
+      "sample_id": "TBP-C-2026-03",
+      "feed_density_g_cm3": 0.772,
+      "residue_density_g_cm3": 0.992,
+      "conditions": {
+        "apparatus": "恩氏蒸馏（培训用）",
+        "standard": "ASTM D86",
+        "pressure_mm_hg": 760,
+        "note": "数据中 190℃ 处回收量被误抄低，曲线下降，应先核实"
+      },
+      "notes": "用于演示：曲线下降硬错误、重叠与缺口、越界切点、总量提示。",
+      "points": [
+        {"temp_c": 40, "recovered_pct": 0.0},
+        {"temp_c": 70, "recovered_pct": 8.0},
+        {"temp_c": 105, "recovered_pct": 18.0},
+        {"temp_c": 140, "recovered_pct": 30.0},
+        {"temp_c": 190, "recovered_pct": 28.0},
+        {"temp_c": 230, "recovered_pct": 45.0},
+        {"temp_c": 270, "recovered_pct": 58.0},
+        {"temp_c": 310, "recovered_pct": 70.0},
+        {"temp_c": 350, "recovered_pct": 81.0}
+      ],
+      "density_rows": [
+        {"temp_c": 55, "density_g_cm3": 0.655},
+        {"temp_c": 90, "density_g_cm3": 0.685},
+        {"temp_c": 125, "density_g_cm3": 0.715},
+        {"temp_c": 165, "density_g_cm3": 0.745},
+        {"temp_c": 210, "density_g_cm3": 0.775},
+        {"temp_c": 250, "density_g_cm3": 0.802},
+        {"temp_c": 290, "density_g_cm3": 0.828},
+        {"temp_c": 330, "density_g_cm3": 0.852}
+      ],
+      "plans": [
+        {
+          "name": "C-错误切割练习（重叠+缺口+越界）",
+          "basis": "volume",
+          "loss_pct": 19.0,
+          "cuts": [
+            {"name": "馏分1", "start_temp_c": 40, "end_temp_c": 120},
+            {"name": "馏分2", "start_temp_c": 100, "end_temp_c": 200},
+            {"name": "馏分3", "start_temp_c": 240, "end_temp_c": 310},
+            {"name": "馏分4", "start_temp_c": 300, "end_temp_c": 400}
+          ]
+        }
+      ]
+    }
+  ]
+}
