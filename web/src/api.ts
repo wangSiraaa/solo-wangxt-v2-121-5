@@ -1,4 +1,5 @@
 import type {
+  CandidatePreviewResponse,
   CurveSample,
   EvalResult,
   Experiment,
@@ -40,6 +41,15 @@ export const api = {
       `/api/experiments/${id}/plans`,
       { method: "POST", body: JSON.stringify(plan) }
     ),
+  /** 候选方案批量预览：content 为 CSV 文本或 JSON 文本，仅评估不落库。 */
+  previewCandidates: (id: number, content: string, format: "csv" | "json") =>
+    req<CandidatePreviewResponse>(`/api/experiments/${id}/candidates/preview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": format === "csv" ? "text/csv; charset=utf-8" : "application/json",
+      },
+      body: content,
+    }),
   seed: () =>
     req<{ loaded_experiments: number }>("/api/seed", { method: "POST" }),
 };

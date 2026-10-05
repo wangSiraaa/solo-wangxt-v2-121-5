@@ -53,6 +53,22 @@
 - **示例 C**：190 ℃ 处回收量被误抄低（**曲线下降硬错误**），切点带两处**重叠**、
   一处**中间缺口**和越界尾段；密度与进料不自洽时给出质量平衡核实提示。
 
+## 候选方案批量预览
+
+老师手头有几套候选切点时，可先在选定试验上**批量试算比较**再决定保存哪一套：
+
+- 前端“候选方案批量预览”面板支持粘贴/上传 **CSV 或 JSON**；CSV 首行表头
+  `候选,馏分,初馏点,终馏点[,损失]`（也接受英文 `candidate,cut,start,end,loss_pct`），
+  同一候选的多个馏分占多行，候选名留空表示继承上一行（兼容 Excel 合并单元格导出）。
+- 后端 `POST /api/experiments/{id}/candidates/preview` 逐项复用与 `/evaluate`
+  **完全相同**的评估规则，返回每项的产率、平衡闭合、重叠/缺口与问题摘要；
+  **单项无效只标记该项**（如某行温度不是数字），不影响其他候选；
+  整份文件格式错误返回 422。
+- 预览表格可按**并集产率**或**问题数**排序，无效候选沉底并附原因；
+  点击“采用此候选”把切点带入现有方案编辑/实时计算流程，确认后再保存——
+  保存结果与预览完全一致（同一计算路径）。
+- 预览全程**只读**：不创建方案、不修改试验数据。
+
 ## 导出
 
 保存方案后可导出 Markdown / JSON，均包含：
@@ -89,7 +105,7 @@ npm run dev        # http://localhost:5173 ，/api 已代理到 8000
 ### 测试
 
 ```bash
-cd backend && python3 -m pytest -q   # 26 个用例：插值/密度/重叠/缺口/闭合/API
+cd backend && python3 -m pytest -q   # 32 个用例：插值/密度/重叠/缺口/闭合/API/批量预览
 cd web && npm run build              # tsc 类型检查 + 构建
 ```
 
@@ -101,6 +117,7 @@ cd web && npm run build              # tsc 类型检查 + 构建
 | POST | `/api/experiments` | 录入试验（曲线下降等硬错误返回 422 及问题清单） |
 | GET | `/api/experiments/{id}/curve/sample` | 实测范围内的 PCHIP 取样曲线（画图用） |
 | POST | `/api/experiments/{id}/evaluate` | 按切点实时计算，不落库 |
+| POST | `/api/experiments/{id}/candidates/preview` | 候选方案批量预览（CSV/JSON，逐项评估，不落库） |
 | POST | `/api/experiments/{id}/plans` | 保存方案（同时存结果快照） |
 | GET | `/api/plans/{id}/export?format=markdown\|json` | 导出 |
 

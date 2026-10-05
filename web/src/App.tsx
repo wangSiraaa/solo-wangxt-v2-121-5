@@ -5,6 +5,7 @@ import type {
 } from "./types";
 import CurveChart from "./components/CurveChart";
 import CutEditor from "./components/CutEditor";
+import CandidatePreview from "./components/CandidatePreview";
 import ResultsPanel from "./components/ResultsPanel";
 import IssuesPanel from "./components/IssuesPanel";
 
@@ -125,6 +126,20 @@ export default function App() {
     }
   };
 
+  /** 采用批量预览中的候选：带入现有编辑/实时计算/保存流程（不直接落库）。 */
+  const adoptCandidate = (plan: PlanInput) => {
+    setPlanName(plan.name);
+    setBasis(plan.basis);
+    setLossPct(plan.loss_pct);
+    setCuts(plan.cuts.map((c) => ({ ...c })));
+    setSavedId(null);
+    setError(null);
+    window.setTimeout(
+      () => document.querySelector(".editor")?.scrollIntoView({ behavior: "smooth" }),
+      50
+    );
+  };
+
   return (
     <div className="app">
       <header>
@@ -164,6 +179,10 @@ export default function App() {
             <span key={k} className="cond-item">{k}={String(v)}</span>
           ))}
         </div>
+      )}
+
+      {expId !== null && (
+        <CandidatePreview expId={expId} onAdopt={adoptCandidate} />
       )}
 
       {sample && result && (

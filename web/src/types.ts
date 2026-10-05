@@ -147,3 +147,37 @@ export interface CurveSample {
   issues: Issue[];
   has_blocking_errors: boolean;
 }
+
+/** 候选方案批量预览：单个候选的摘要指标（产率/平衡/重叠缺口/问题数）。 */
+export interface CandidateSummary {
+  nominal_yield_pct: number;
+  union_yield_pct: number;
+  overlap_pct: number;
+  gap_total_pct: number;
+  residual_total_pct: number;
+  identity_ok: boolean;
+  identity_residual_pct: number;
+  n_errors: number;
+  n_warnings: number;
+  n_infos: number;
+  n_issues: number;
+  has_blocking_errors: boolean;
+}
+
+export interface CandidatePreviewItem {
+  index: number;
+  name: string;
+  valid: boolean;
+  error: string | null;
+  plan: PlanInput | null;
+  summary: CandidateSummary | null;
+  result: EvalResult | null;
+}
+
+export interface CandidatePreviewResponse {
+  experiment_id: number;
+  count: number;
+  valid_count: number;
+  row_errors: string[];
+  candidates: CandidatePreviewItem[];
+}

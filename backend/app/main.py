@@ -9,6 +9,7 @@ POST /api/experiments
 GET  /api/experiments/{id}
 GET  /api/experiments/{id}/curve/sample
 POST /api/experiments/{id}/evaluate                 仅计算，不落库
+POST /api/experiments/{id}/candidates/preview       候选方案批量预览（CSV/JSON，仅计算，不落库）
 POST /api/experiments/{id}/plans                    保存方案
 GET  /api/plans/{id}                                读方案（重新计算）
 GET  /api/plans/{id}/export?format=markdown|json    导出
@@ -21,12 +22,17 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from .candidates import (
+    CandidateFormatError,
+    parse_candidates_csv,
+    preview_one,
+)
 from .config import settings
 from .curve import prepare_curve
 from .database import get_session, init_db
@@ -227,6 +233,64 @@ async def evaluate(exp_id: int, payload: PlanIn) -> dict:
         if exp is None:
             raise HTTPException(404, "试验不存在")
         return _eval_experiment(exp, payload)
+
+
+# ---- 候选方案批量预览（只读评估，不落库、不改试验数据）----
+@app.post("/api/experiments/{exp_id}/candidates/preview")
+async def preview_candidates(exp_id: int, request: Request) -> dict:
+    """接收一组候选切点方案（JSON 或 CSV），逐项复用单项评估规则试算。
+
+    * JSON（``application/json``）：``{"candidates": [...]}`` 或直接 ``[...]``，
+      每项与 ``/evaluate`` 的请求体相同（name/basis/loss_pct/cuts）；
+    * CSV（``text/csv``）：见 ``candidates.parse_candidates_csv`` 的表头约定；
+    * 单项无效只标记该项（``valid=false`` + 原因），不影响其他候选；
+    * 整份文件格式错误返回 422；本端点不创建方案、不修改试验数据。
+    """
+    async for session in get_session():
+        exp = await session.get(Experiment, exp_id)
+        if exp is None:
+            raise HTTPException(404, "试验不存在")
+
+        ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        row_errors: list[str] = []
+        if ctype in ("text/csv", "text/plain", "application/csv"):
+            raw_text = (await request.body()).decode("utf-8-sig", errors="replace")
+            try:
+                raw_candidates, row_errors = parse_candidates_csv(raw_text)
+            except CandidateFormatError as exc:
+                raise HTTPException(422, str(exc)) from exc
+        else:
+            try:
+                body = await request.json()
+            except Exception:
+                raise HTTPException(
+                    422, "请求体不是合法 JSON；CSV 请使用 Content-Type: text/csv"
+                ) from None
+            if isinstance(body, list):
+                raw_candidates = body
+            elif isinstance(body, dict) and isinstance(body.get("candidates"), list):
+                raw_candidates = body["candidates"]
+            else:
+                raise HTTPException(
+                    422, "JSON 需为候选数组，或形如 {\"candidates\": [...]} 的对象"
+                )
+
+        if not raw_candidates:
+            raise HTTPException(422, "未解析到任何候选方案")
+
+        def _run(plan: PlanIn) -> dict:
+            return _eval_experiment(exp, plan)
+
+        candidates = [
+            preview_one(raw, i, _run) for i, raw in enumerate(raw_candidates)
+        ]
+        return {
+            "experiment_id": exp_id,
+            "count": len(candidates),
+            "valid_count": sum(1 for c in candidates if c["valid"]),
+            "row_errors": row_errors,
+            "candidates": candidates,
+        }
 
 
 @app.post("/api/experiments/{exp_id}/plans", status_code=201)
