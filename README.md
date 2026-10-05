@@ -53,6 +53,39 @@
 - **示例 C**：190 ℃ 处回收量被误抄低（**曲线下降硬错误**），切点带两处**重叠**、
   一处**中间缺口**和越界尾段；密度与进料不自洽时给出质量平衡核实提示。
 
+## 候选方案批量预览
+
+老师拿到多套候选切点后，可在选定试验上一次比较再决定保存哪一套：
+前端「📋 候选切点批量预览」支持粘贴文本或选择 `.csv/.json` 文件，
+可按**并集产率**或**问题数**排序，展开任一候选可查看逐切点标记与完整问题摘要，
+点「带入编辑」即填入现有切点编辑器，再走既有保存流程。
+
+- **逐项复用同一套评估规则**：每个有效候选的 `result` 与
+  `POST /evaluate` 返回逐字段一致，保存结果与单独评估完全相同；
+- **单项无效只标记该候选**：缺候选名称、温度不是数字、切点列表为空等
+  结构错误返回 `valid=false` + 错误清单（`result=null`），不吞掉其他候选；
+  越界 / 重叠 / 零宽 / 反向 / 曲线硬错误属于**评估结果**，照常逐项说明；
+- **错误格式不创建方案**：非法 JSON、CSV 缺必需列、内容为空等文件级错误
+  返回 422；预览接口只读，任何情况下都不落库、不改原始试验数据。
+
+CSV（同一候选名称的多行聚合为一项；`basis`/`loss_pct` 可选、留空取当前默认）：
+
+```csv
+candidate,cut,start_temp_c,end_temp_c,basis,loss_pct
+方案甲,轻馏分,30,185,volume,0
+方案甲,重馏分,185,450,,
+方案乙,宽馏分,50,650,volume,0
+```
+
+JSON（数组或 `{"candidates": [...]}`；表头/键名兼容中文别名）：
+
+```json
+[
+  {"name": "方案甲", "cuts": [
+      {"name": "轻馏分", "start_temp_c": 30, "end_temp_c": 185}]}
+]
+```
+
 ## 导出
 
 保存方案后可导出 Markdown / JSON，均包含：
@@ -89,7 +122,7 @@ npm run dev        # http://localhost:5173 ，/api 已代理到 8000
 ### 测试
 
 ```bash
-cd backend && python3 -m pytest -q   # 26 个用例：插值/密度/重叠/缺口/闭合/API
+cd backend && python3 -m pytest -q   # 34 个用例：插值/密度/重叠/缺口/闭合/API/候选批量预览
 cd web && npm run build              # tsc 类型检查 + 构建
 ```
 
@@ -101,6 +134,7 @@ cd web && npm run build              # tsc 类型检查 + 构建
 | POST | `/api/experiments` | 录入试验（曲线下降等硬错误返回 422 及问题清单） |
 | GET | `/api/experiments/{id}/curve/sample` | 实测范围内的 PCHIP 取样曲线（画图用） |
 | POST | `/api/experiments/{id}/evaluate` | 按切点实时计算，不落库 |
+| POST | `/api/experiments/{id}/candidates/preview` | 候选方案批量预览（CSV/JSON 文本，逐项复用 evaluate 规则，只读不落库） |
 | POST | `/api/experiments/{id}/plans` | 保存方案（同时存结果快照） |
 | GET | `/api/plans/{id}/export?format=markdown\|json` | 导出 |
 

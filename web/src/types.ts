@@ -147,3 +147,51 @@ export interface CurveSample {
   issues: Issue[];
   has_blocking_errors: boolean;
 }
+
+// ---- 候选方案批量预览 ----
+export interface CandidateSummary {
+  volume_yield_pct: number;
+  nominal_volume_yield_pct: number;
+  mass_yield_pct: number | null;
+  nominal_mass_yield_pct: number | null;
+  overlap_count: number;
+  overlap_pct: number;
+  gap_count: number;
+  gap_pct: number;
+  residue_pct: number;
+  identity_sum_pct: number;
+  identity_ok: boolean;
+  issue_count: number;
+  error_count: number;
+  warning_count: number;
+  info_count: number;
+  has_blocking_errors: boolean;
+}
+
+export interface CandidatePreviewItem {
+  index: number;
+  name: string | null;
+  basis: "volume" | "mass";
+  loss_pct: number;
+  cut_count: number;
+  valid: boolean;
+  errors: string[];
+  summary: CandidateSummary | null;
+  result: EvalResult | null;
+}
+
+export interface CandidatesPreview {
+  experiment_id: number;
+  format: string;
+  total: number;
+  valid_count: number;
+  invalid_count: number;
+  candidates: CandidatePreviewItem[];
+}
+
+export interface CandidatesInput {
+  content: string;
+  format?: "auto" | "csv" | "json";
+  basis?: "volume" | "mass";
+  loss_pct?: number;
+}

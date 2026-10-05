@@ -73,3 +73,16 @@ class PlanOut(BaseModel):
     result_snapshot: dict | None = None
 
     model_config = {"from_attributes": True}
+
+
+# ---- 候选批量预览 ----
+class CandidatesIn(BaseModel):
+    """批量预览请求：CSV / JSON 文本 + 该试验下的默认口径与损失。
+
+    预览只计算不落库；候选自身可在文本中逐项覆盖 basis / loss_pct。
+    """
+
+    content: str = Field(min_length=1, description="候选方案的 CSV 或 JSON 文本")
+    format: Literal["auto", "csv", "json"] = "auto"
+    basis: Literal["volume", "mass"] = "volume"
+    loss_pct: float = Field(default=0.0, ge=0, le=100)

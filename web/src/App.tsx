@@ -7,6 +7,7 @@ import CurveChart from "./components/CurveChart";
 import CutEditor from "./components/CutEditor";
 import ResultsPanel from "./components/ResultsPanel";
 import IssuesPanel from "./components/IssuesPanel";
+import CandidatePreview from "./components/CandidatePreview";
 
 function defaultCuts(sample: CurveSample) {
   const [lo, hi] = sample.range.temp_c;
@@ -35,6 +36,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  const [appliedCandidate, setAppliedCandidate] = useState<number | null>(null);
 
   useEffect(() => {
     api.listExperiments()
@@ -49,6 +51,7 @@ export default function App() {
     if (expId === null) return;
     setError(null);
     setResult(null);
+    setAppliedCandidate(null);
     Promise.all([api.getExperiment(expId), api.curveSample(expId)])
       .then(([exp, s]) => {
         setExperiment(exp);
@@ -113,6 +116,19 @@ export default function App() {
     }
   };
 
+  // 从批量预览带入一项：仅填充现有编辑器状态，原始试验数据不变；
+  // 保存仍走既有 /plans 流程（payload effect 会自动重新评估）。
+  const applyCandidate = (p: {
+    name: string; basis: "volume" | "mass"; loss_pct: number; cuts: PlanInput["cuts"];
+  }, index: number) => {
+    setPlanName(p.name);
+    setBasis(p.basis);
+    setLossPct(p.loss_pct);
+    setCuts(p.cuts);
+    setSavedId(null);
+    setAppliedCandidate(index);
+  };
+
   const loadSeed = async () => {
     try {
       const r = await api.seed();
@@ -171,16 +187,24 @@ export default function App() {
           <CurveChart sample={sample} cuts={cuts} overlaps={result.overlaps} />
           <IssuesPanel issues={result.issues} />
 
+          <CandidatePreview
+            expId={expId!}
+            defaultBasis={basis}
+            defaultLossPct={lossPct}
+            appliedIndex={appliedCandidate}
+            onApply={(p, index) => applyCandidate(p, index)}
+          />
+
           <CutEditor
             cuts={cuts}
             lossPct={lossPct}
             basis={basis}
             planName={planName}
             range={sample.range.temp_c}
-            onChange={setCuts}
-            onLossChange={setLossPct}
-            onBasisChange={setBasis}
-            onPlanNameChange={setPlanName}
+            onChange={(v) => { setCuts(v); setAppliedCandidate(null); }}
+            onLossChange={(v) => { setLossPct(v); setAppliedCandidate(null); }}
+            onBasisChange={(v) => { setBasis(v); setAppliedCandidate(null); }}
+            onPlanNameChange={(v) => { setPlanName(v); setAppliedCandidate(null); }}
           />
 
           <ResultsPanel result={result} basis={basis} />

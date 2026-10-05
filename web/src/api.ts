@@ -1,4 +1,6 @@
 import type {
+  CandidatesInput,
+  CandidatesPreview,
   CurveSample,
   EvalResult,
   Experiment,
@@ -34,6 +36,11 @@ export const api = {
     req<EvalResult>(`/api/experiments/${id}/evaluate`, {
       method: "POST",
       body: JSON.stringify(plan),
+    }),
+  previewCandidates: (id: number, payload: CandidatesInput) =>
+    req<CandidatesPreview>(`/api/experiments/${id}/candidates/preview`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     }),
   savePlan: (id: number, plan: PlanInput) =>
     req<{ id: number; result: EvalResult }>(

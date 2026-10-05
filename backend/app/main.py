@@ -9,6 +9,7 @@ POST /api/experiments
 GET  /api/experiments/{id}
 GET  /api/experiments/{id}/curve/sample
 POST /api/experiments/{id}/evaluate                 仅计算，不落库
+POST /api/experiments/{id}/candidates/preview       候选方案批量预览，不落库
 POST /api/experiments/{id}/plans                    保存方案
 GET  /api/plans/{id}                                读方案（重新计算）
 GET  /api/plans/{id}/export?format=markdown|json    导出
@@ -24,9 +25,11 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from .candidates import CandidateInputError, parse_candidate_bundle
 from .config import settings
 from .curve import prepare_curve
 from .database import get_session, init_db
@@ -34,7 +37,13 @@ from .density import prepare_density
 from .exporters import build_markdown, to_json
 from .models import Experiment, Plan
 from .planning import evaluate_plan
-from .schemas import ExperimentIn, ExperimentOut, PlanIn, PlanOut
+from .schemas import (
+    CandidatesIn,
+    ExperimentIn,
+    ExperimentOut,
+    PlanIn,
+    PlanOut,
+)
 
 app = FastAPI(
     title="蒸馏曲线切点与产率核对（培训）",
@@ -74,6 +83,39 @@ def _eval_experiment(exp: Experiment, payload: PlanIn) -> dict:
         feed_density=exp.feed_density_g_cm3,
         residue_density=exp.residue_density_g_cm3,
     )
+
+
+def _candidate_summary(result: dict) -> dict:
+    """从单项评估结果抽取批量比较所需的产率/平衡/重叠缺口/问题摘要。
+
+    与单项 evaluate 完全同源（同一个 dict），只做只读汇总，不改任何数字。
+    """
+    totals = result["totals"]
+    mass = totals.get("mass")
+    gaps = result.get("gaps", [])
+    issues = result.get("issues", [])
+    n_gap = sum(1 for g in gaps if g.get("width_c", 0) > 0)
+    n_overlap = len(result.get("overlaps", []))
+    return {
+        "volume_yield_pct": totals["union_yield_pct"],
+        "nominal_volume_yield_pct": totals["nominal_yield_pct"],
+        "mass_yield_pct": mass["union_yield_pct"] if mass else None,
+        "nominal_mass_yield_pct": mass["nominal_yield_pct"] if mass else None,
+        "overlap_count": n_overlap,
+        "overlap_pct": totals["overlap_pct"],
+        "gap_count": n_gap,
+        "gap_pct": round(
+            totals["front_gap_pct"] + totals["inter_gap_pct"] + totals["tail_gap_pct"], 4
+        ),
+        "residue_pct": totals["residual_total_pct"],
+        "identity_sum_pct": totals["identity_sum_pct"],
+        "identity_ok": totals["identity_ok"],
+        "issue_count": len(issues),
+        "error_count": sum(1 for i in issues if i["severity"] == "error"),
+        "warning_count": sum(1 for i in issues if i["severity"] == "warning"),
+        "info_count": sum(1 for i in issues if i["severity"] == "info"),
+        "has_blocking_errors": bool(result.get("has_blocking_errors")),
+    }
 
 
 def _exp_to_out(exp: Experiment) -> dict:
@@ -227,6 +269,79 @@ async def evaluate(exp_id: int, payload: PlanIn) -> dict:
         if exp is None:
             raise HTTPException(404, "试验不存在")
         return _eval_experiment(exp, payload)
+
+
+@app.post("/api/experiments/{exp_id}/candidates/preview")
+async def preview_candidates(exp_id: int, payload: CandidatesIn) -> dict:
+    """候选方案批量预览：逐项复用现有评估规则，只读、不落库、不改试验数据。
+
+    * 文件级格式错误（非法 CSV/JSON、缺必需列）=> 422，不创建任何方案；
+    * 单项结构错误（缺名称/温度非数字/切点为空）只标记该候选 valid=False，
+      其余候选照常评估；越界、重叠等是评估结果而非结构错误，照常逐项说明。
+    """
+    async for session in get_session():
+        exp = await session.get(Experiment, exp_id)
+        if exp is None:
+            raise HTTPException(404, "试验不存在")
+
+        try:
+            parsed = parse_candidate_bundle(
+                payload.content,
+                fmt=payload.format,
+                default_basis=payload.basis,
+                default_loss_pct=payload.loss_pct,
+            )
+        except CandidateInputError as e:
+            raise HTTPException(
+                422,
+                detail={"message": e.message, "errors": e.errors},
+            ) from e
+
+        items: list[dict] = []
+        for idx, cand in enumerate(parsed):
+            item: dict = {
+                "index": idx,
+                "name": cand["name"],
+                "basis": cand["basis"],
+                "loss_pct": cand["loss_pct"],
+                "cut_count": len(cand["cuts"]),
+                "valid": False,
+                "errors": list(cand["errors"]),
+                "summary": None,
+                "result": None,
+            }
+            if cand["errors"]:
+                items.append(item)
+                continue
+            try:
+                plan_in = PlanIn(
+                    name=cand["name"],
+                    basis=cand["basis"],
+                    loss_pct=cand["loss_pct"],
+                    cuts=cand["cuts"],
+                )
+            except ValidationError as ve:
+                # 解析层放行但模型层把关（如长度上限）：只标记本候选
+                item["errors"].extend(
+                    err["msg"] for err in ve.errors() if err.get("msg")
+                )
+                items.append(item)
+                continue
+
+            result = _eval_experiment(exp, plan_in)
+            item["valid"] = True
+            item["summary"] = _candidate_summary(result)
+            item["result"] = result
+            items.append(item)
+
+        return {
+            "experiment_id": exp_id,
+            "format": payload.format,
+            "total": len(items),
+            "valid_count": sum(1 for i in items if i["valid"]),
+            "invalid_count": sum(1 for i in items if not i["valid"]),
+            "candidates": items,
+        }
 
 
 @app.post("/api/experiments/{exp_id}/plans", status_code=201)
